@@ -16,6 +16,7 @@ Author URI: http://enanocms.org/
  * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for details.
  */
 
+$plugins->attachHook('render_wikiformat_pre', 'mediafier_draw_toc($text);');
 $plugins->attachHook('render_wikiformat_post', 'mediafy($result);');
 $plugins->attachHook('compile_template', 'mediafier_add_headers();');
 $plugins->attachHook('html_attribute_whitelist', '$whitelist["ref"] = array(); $whitelist["references"] = array("/");');
@@ -25,6 +26,66 @@ function mediafy(&$text)
   global $db, $session, $paths, $template, $plugins; // Common objects
   mediafy_highlight_search_words($text);
   mediafy_process_references($text);
+}
+
+function mediafier_draw_toc(&$text)
+{
+  if ( strstr($text, '__NOTOC__') )
+    return true;
+  
+  if ( !preg_match_all('/^\s*([=]{1,6})([^\r\n]+)\\1\s*$/m', $text, $matches) )
+    return true;
+  
+  $heading_map = array();
+  foreach ( $matches[1] as $heading )
+  {
+    $heading_map[] = strlen($heading);
+  }
+  
+  if ( count($heading_map) < 4 && !strstr($text, '__TOC__') )
+    return true;
+  
+  $prev = 0;
+  $levels = 0;
+  $treenum = array();
+  $toc = '';
+  foreach ( $heading_map as $i => $head )
+  {
+    if ( $head > $prev )
+    {
+      $treenum[] = 0;
+      $levels++;
+      $toc .= '<dl>';
+    }
+    else if ( $head < $prev )
+    {
+      if ( $levels > 1 )
+      {
+        $toc .= '</dl>';
+        $levels--;
+        unset($treenum[count($treenum)-1]);
+      }
+    }
+    $treenum[count($treenum)-1]++;
+    if ( $i > 0 )
+      $toc .= '</dd>';
+    $toc .= '<dd><a href="#toc' . ($i + 1) . '">' . implode('.', $treenum) . ' ' . htmlspecialchars($matches[2][$i]) . '</a>';
+    $prev = $head;
+  }
+  while ( $levels > 0 )
+  {
+    $toc .= '</dd></dl>';
+    $levels--;
+  }
+  $toc_body = "<nowiki><div class=\"toc mdg-comment\">
+                <dl><dd><b>Contents</b> <small>[<a href=\"#\" onclick=\"collapseTOC(this); return false;\">hide</a>]</small></dd></dl>
+                <div>$toc</div>
+              </div></nowiki>";
+              
+  if ( strstr($text, '__TOC__') )
+    $text = str_replace_once('__TOC__', $toc_body, $text);
+  else if ( ($text = preg_replace('/^=/', "$toc_body\n\n=", $text)) === $text )
+    $text = str_replace_once("\n=", "\n$toc_body\n=", $text);
 }
 
 function mediafier_add_headers()
@@ -37,6 +98,20 @@ function mediafier_add_headers()
                       </style>");
   $ref_script = <<<EOF
       <enano:no-opt>
+      <style type="text/css">
+      div.toc {
+        display: table;
+        max-width: 70%;
+        padding: 0.7em 1.7em 0.7em 0.7em;
+        margin: 10px 0 0 0;
+      }
+      div.toc dl {
+        margin: 2px 0;
+      }
+      div.toc dd {
+        margin-left: 1em;
+      }
+      </style>
       <script type="text/javascript">
       // <![CDATA[
         function refsOff()
@@ -44,23 +119,37 @@ function mediafier_add_headers()
           var divs = getElementsByClassName(document, '*', 'refbottom');
           for ( var i in divs )
           {
-            $(divs[i]).rmClass('refbak');
+            \$dynano(divs[i]).rmClass('refbak');
           }
           divs = getElementsByClassName(document, '*', 'reftop');
           for ( var i in divs )
           {
-            $(divs[i]).rmClass('refbak');
+            \$dynano(divs[i]).rmClass('refbak');
           }
         }
         function refToBottom(id)
         {
           refsOff();
-          $('ref_'+id+'_b').addClass('refbak');
+          \$dynano('ref_'+id+'_b').addClass('refbak');
         }
         function refToTop(id)
         {
           refsOff();
-          $('cite_'+id).addClass('refbak');
+          \$dynano('cite_'+id).addClass('refbak');
+        }
+        function collapseTOC(el)
+        {
+          var toc_inner = el.parentNode.parentNode.parentNode.parentNode.getElementsByTagName('div')[0];
+          if ( toc_inner.style.display == 'none' )
+          {
+            el.innerHTML = 'hide';
+            toc_inner.style.display = 'block';
+          }
+          else
+          {
+            el.innerHTML = 'show';
+            toc_inner.style.display = 'none';
+          }
         }
         // ]]>
       </script>
