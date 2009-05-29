@@ -16,7 +16,7 @@ Author URI: http://enanocms.org/
  * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for details.
  */
 
-$plugins->attachHook('render_wikiformat_pre', 'mediafier_draw_toc($text);');
+$plugins->attachHook('render_wikiformat_posttemplates', 'mediafier_draw_toc($text);');
 $plugins->attachHook('render_wikiformat_post', 'mediafy($result);');
 $plugins->attachHook('compile_template', 'mediafier_add_headers();');
 $plugins->attachHook('html_attribute_whitelist', '$whitelist["ref"] = array(); $whitelist["references"] = array("/");');
@@ -66,7 +66,8 @@ function mediafier_draw_toc(&$text)
         unset($treenum[count($treenum)-1]);
       }
     }
-    $treenum[count($treenum)-1]++;
+    if ( isset($treenum[count($treenum)-1]) )
+      $treenum[count($treenum)-1]++;
     if ( $i > 0 )
       $toc .= '</dd>';
     $toc .= '<dd><a href="#toc' . ($i + 1) . '">' . implode('.', $treenum) . ' ' . htmlspecialchars($matches[2][$i]) . '</a>';
@@ -81,11 +82,20 @@ function mediafier_draw_toc(&$text)
                 <dl><dd><b>Contents</b> <small>[<a href=\"#\" onclick=\"collapseTOC(this); return false;\">hide</a>]</small></dd></dl>
                 <div>$toc</div>
               </div></nowiki>";
-              
+    
   if ( strstr($text, '__TOC__') )
+  {
     $text = str_replace_once('__TOC__', $toc_body, $text);
-  else if ( ($text = preg_replace('/^=/', "$toc_body\n\n=", $text)) === $text )
+  }
+  else if ( $text === ($rtext = preg_replace('/^=/', "$toc_body\n\n=", $text)) )
+  {
     $text = str_replace_once("\n=", "\n$toc_body\n=", $text);
+  }
+  else
+  {
+    $text = $rtext;
+    unset($rtext);
+  }
 }
 
 function mediafier_add_headers()
@@ -202,7 +212,7 @@ function mediafy_highlight_search_words(&$result)
   // highlight matches
   foreach ( $words as $word )
   {
-    $result = preg_replace('/([\W]|^)(' . preg_quote($word) . ')([\W])/i', "\\1<span class=\"highlight\">\\2</span>\\3", $result);
+    $result = preg_replace('/([\W]|^)(' . str_replace('/', '\/', preg_quote($word)) . ')([\W])/i', "\\1<span class=\"highlight\">\\2</span>\\3", $result);
   }
   
   // restore HTML
@@ -256,6 +266,7 @@ function mediafy_process_references(&$text)
   foreach ( $refs as $i => $ref )
   {
     $reflink = '<span id="ref_' . $i . '" name="ref_' . $i . '"><sup><b><a onclick="refToTop(\'' . $i . '\');" href="#cite_' . $i . '">^</a></b></sup> </span>';
+    $ref = trim($ref);
     $refsdiv .= "<div class=\"refbottom\" id=\"ref_{$i}_b\">$reflink $i. $ref</div>";
     if ( $i == $count )
       $refsdiv .= '</td><td valign="top">';
