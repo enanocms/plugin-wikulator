@@ -66,11 +66,12 @@ function mediafier_draw_toc(&$text)
         unset($treenum[count($treenum)-1]);
       }
     }
+    $treenum = array_values($treenum);
     if ( isset($treenum[count($treenum)-1]) )
       $treenum[count($treenum)-1]++;
     if ( $i > 0 )
       $toc .= '</dd>';
-    $toc .= '<dd><a href="#toc' . ($i + 1) . '">' . implode('.', $treenum) . ' ' . htmlspecialchars($matches[2][$i]) . '</a>';
+    $toc .= '<dd><a href="#toc' . $i . '">' . implode('.', $treenum) . ' ' . htmlspecialchars($matches[2][$i]) . '</a>';
     $prev = $head;
   }
   while ( $levels > 0 )
