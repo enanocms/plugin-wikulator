@@ -1,7 +1,7 @@
 <?php
 /*
-Plugin Name: Mediafier
-Plugin URI: http://enanocms.org/Mediafier
+Plugin Name: Wikulator
+Plugin URI: http://enanocms.org/plugin/wikulator
 Description: Several parser extensions that provide MediaWiki-like support for references, search highlighting, and a table of contents to Enano
 Author: Dan Fuhry
 Version: 0.1 beta 1
@@ -71,7 +71,16 @@ function mediafier_draw_toc(&$text)
       $treenum[count($treenum)-1]++;
     if ( $i > 0 )
       $toc .= '</dd>';
-    $toc .= '<dd><a href="#toc' . $i . '">' . implode('.', $treenum) . ' ' . htmlspecialchars($matches[2][$i]) . '</a>';
+    if ( version_compare(enano_version(), '1.1.7', '>=') )
+    {
+		$tocid = sanitize_page_id(trim($matches[2][$i]));
+		$tocid = str_replace(array('[', ']'), '', $tocid);
+	}
+	else
+	{
+		$tocid = "$i";
+	}
+	$toc .= '<dd><a href="#head:' . $tocid . '">' . implode('.', $treenum) . ' ' . htmlspecialchars($matches[2][$i]) . '</a>';
     $prev = $head;
   }
   while ( $levels > 0 )
