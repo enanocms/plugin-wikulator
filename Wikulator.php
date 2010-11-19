@@ -30,6 +30,8 @@ function mediafy(&$text)
 
 function mediafier_draw_toc(&$text)
 {
+	static $heading_names = array();
+	
   if ( strstr($text, '__NOTOC__') )
     return true;
   
@@ -48,46 +50,69 @@ function mediafier_draw_toc(&$text)
   $prev = 0;
   $levels = 0;
   $treenum = array();
-  $toc = '';
+  $toc = "\n";
   foreach ( $heading_map as $i => $head )
   {
-    if ( $head > $prev )
-    {
-      $treenum[] = 0;
-      $levels++;
-      $toc .= '<dl>';
-    }
-    else if ( $head < $prev )
-    {
-      if ( $levels > 1 )
-      {
-        $toc .= '</dl>';
-        $levels--;
-        unset($treenum[count($treenum)-1]);
-      }
-    }
+  	// $head = level of the heading (1-6)
+  	  
+  	if ( $head > $prev )
+  	{
+  		// deeper heading than the previous; indent
+  		$toc .= "\n    <dl>\n  ";
+  		$levels++;
+  		$treenum[] = 0;
+  	}
+  	else if ( $head < $prev )
+  	{
+  		// shallower heading than the previous; go up by one
+  		$toc .= "</dd></dl></dd>\n  ";
+  		$levels--;
+  		array_pop($treenum);
+  	}
+  	else
+  	{
+  		// same as previous; terminate it
+  		$toc .= "</dd>\n  ";
+  	}
+  	
     $treenum = array_values($treenum);
     if ( isset($treenum[count($treenum)-1]) )
       $treenum[count($treenum)-1]++;
-    if ( $i > 0 )
-      $toc .= '</dd>';
+  	
     if ( version_compare(enano_version(), '1.1.7', '>=') )
     {
 		$tocid = sanitize_page_id(trim($matches[2][$i]));
 		$tocid = str_replace(array('[', ']'), '', $tocid);
+		
+		// conflict avoidance
+		if ( isset($heading_names[$tocid]) )
+		{
+			$id = 2;
+			while ( isset($heading_names["{$tocid}{$id}"]) )
+				$id++;
+			
+			$tocid .= $id;
+		}
+		$heading_names[$tocid] = true;
 	}
 	else
 	{
 		$tocid = "$i";
 	}
-	$toc .= '<dd><a href="#head:' . $tocid . '">' . implode('.', $treenum) . ' ' . htmlspecialchars($matches[2][$i]) . '</a>';
-    $prev = $head;
+	
+	$toc .= '<dd><a href="#head:' . $tocid . '">' . implode('.', $treenum) . ' ' . htmlspecialchars($matches[2][$i]) . "</a>";
+	
+	$prev = $head;
   }
-  while ( $levels > 0 )
+  // and at the end of the loop...
+  $toc .= "</dd>\n";
+  while ( $levels > 1 )
   {
-    $toc .= '</dd></dl>';
-    $levels--;
+  	  $toc .= "</dl></dd>\n";
+  	  $levels--;
   }
+  $toc .= "</dl>\n";
+  
   $toc_body = "<nowiki><div class=\"toc mdg-comment\">
                 <dl><dd><b>Contents</b> <small>[<a href=\"#\" onclick=\"collapseTOC(this); return false;\">hide</a>]</small></dd></dl>
                 <div>$toc</div>
